@@ -1,22 +1,15 @@
 ---
 bundle:
   name: issues
-  version: 1.2.0
+  version: 2.0.0
   description: Issue-aware bundle with autonomous issue management and persistent tracking
 
 includes:
   - bundle: foundation
 
-session:
-  orchestrator:
-    module: loop-streaming
-    source: git+https://github.com/microsoft/amplifier-module-loop-streaming@main
-    config:
-      extended_thinking: true
-
 tools:
   - module: tool-issue
-    source: ./modules/tool-issue
+    source: issues:modules/tool-issue
     config:
       data_dir: .amplifier/issues
       auto_create_dir: true
@@ -24,7 +17,7 @@ tools:
 
 hooks:
   - module: hook-issue-auto-work
-    source: ./modules/hook-issue-auto-work
+    source: issues:modules/hook-issue-auto-work
     config:
       priority: 100
       max_auto_iterations: 10
