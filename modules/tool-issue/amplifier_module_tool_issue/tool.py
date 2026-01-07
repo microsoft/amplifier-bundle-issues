@@ -6,7 +6,6 @@ Pure-module implementation requiring zero kernel changes.
 """
 
 import logging
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -118,12 +117,12 @@ class IssueTool:
                     raise ValueError(f"Invalid priority value: {filtered_params['priority']}")
 
         issue = self.issue_manager.create_issue(**filtered_params)
-        return {"issue": asdict(issue)}
+        return {"issue": issue.to_dict()}
 
     async def _list_issues(self, params: dict) -> dict:
         """List issues with optional filters."""
         issues = self.issue_manager.list_issues(**params)
-        return {"issues": [asdict(i) for i in issues], "count": len(issues)}
+        return {"issues": [i.to_dict() for i in issues], "count": len(issues)}
 
     async def _get_issue(self, params: dict) -> dict:
         """Get a specific issue by ID."""
@@ -135,7 +134,7 @@ class IssueTool:
         if not issue:
             raise ValueError(f"Issue {issue_id} not found")
 
-        return {"issue": asdict(issue)}
+        return {"issue": issue.to_dict()}
 
     async def _update_issue(self, params: dict) -> dict:
         """Update an issue."""
@@ -156,29 +155,29 @@ class IssueTool:
                     raise ValueError(f"Invalid priority value: {params['priority']}")
 
         issue = self.issue_manager.update_issue(issue_id, **params)
-        return {"issue": asdict(issue)}
+        return {"issue": issue.to_dict()}
 
     async def _close_issue(self, params: dict) -> dict:
         """Close an issue."""
         issue = self.issue_manager.close_issue(**params)
-        return {"issue": asdict(issue)}
+        return {"issue": issue.to_dict()}
 
     async def _add_dependency(self, params: dict) -> dict:
         """Add a dependency between issues."""
         dep = self.issue_manager.add_dependency(**params)
-        return {"dependency": asdict(dep)}
+        return {"dependency": dep.to_dict()}
 
     async def _get_ready_issues(self, params: dict) -> dict:
         """Get issues that are ready to work on (no blockers)."""
         issues = self.issue_manager.get_ready_issues(**params)
-        return {"ready_issues": [asdict(i) for i in issues], "count": len(issues)}
+        return {"ready_issues": [i.to_dict() for i in issues], "count": len(issues)}
 
     async def _get_blocked_issues(self, params: dict) -> dict:
         """Get issues that are blocked and their blockers."""
         blocked = self.issue_manager.get_blocked_issues()
         return {
             "blocked_issues": [
-                {"issue": asdict(issue), "blockers": [asdict(b) for b in blockers]} for issue, blockers in blocked
+                {"issue": issue.to_dict(), "blockers": [b.to_dict() for b in blockers]} for issue, blockers in blocked
             ],
             "count": len(blocked),
         }
