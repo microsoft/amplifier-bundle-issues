@@ -1,0 +1,38 @@
+{
+	"folders": [
+		{
+			"name": "Root",
+			"path": "."
+		},
+		{
+			"name": "module: tool-issue",
+			"path": "modules/tool-issue"
+		},
+		{
+			"name": "module: issue-manager",
+			"path": "modules/issue-manager"
+		},
+		{
+			"name": "module: hook-issue-auto-work",
+			"path": "modules/hook-issue-auto-work"
+		}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+		"python.terminal.activateEnvironment": true,
+		"files.exclude": {
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/.pytest_cache": true,
+			"**/.mypy_cache": true,
+			"**/.ruff_cache": true
+		},
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-python.vscode-pylance",
+			"charliermarsh.ruff"
+		]
+	}
+}
