@@ -54,7 +54,7 @@ tools:
   - module: tool-issue
     source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/tool-issue
     config:
-      data_dir: .amplifier/issues
+      data_dir: ~/.amplifier/projects/{project}/issues
       auto_create_dir: true
       actor: assistant
 
@@ -71,16 +71,19 @@ Then add instructions in your bundle context similar to what is found in the [bu
 
 ## Data Storage
 
-Issues are stored locally in your project:
+Issues are stored in your home directory under a project-specific path:
 
 ```
-<project-root>/
-└── .amplifier/
-    └── issues/
-        ├── issues.jsonl          # Issue records
-        ├── dependencies.jsonl    # Issue relationships
-        └── events.jsonl          # Change history
+~/.amplifier/
+└── projects/
+    └── {project}/
+        └── issues/
+            ├── issues.jsonl          # Issue records
+            ├── dependencies.jsonl    # Issue relationships
+            └── events.jsonl          # Change history
 ```
+
+The `{project}` placeholder is automatically derived from your working directory.
 
 This can be configured in your bundle (see the Manual Configuration section).
 
