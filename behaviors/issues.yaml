@@ -1,0 +1,28 @@
+---
+bundle:
+  name: issues
+  version: 2.0.0
+  description: Issue-aware bundle with autonomous issue management and persistent tracking
+
+includes:
+  - bundle: foundation
+
+tools:
+  - module: tool-issue
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/tool-issue
+    config:
+      data_dir: ~/.amplifier/projects/{project}/issues
+      auto_create_dir: true
+      actor: assistant
+
+hooks:
+  - module: hook-issue-auto-work
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-auto-work
+    config:
+      priority: 100
+      max_auto_iterations: 10
+      inject_role: system
+
+context:
+  include:
+    - issues:context/issues-instructions.md
