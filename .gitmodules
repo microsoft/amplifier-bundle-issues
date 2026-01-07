@@ -1,0 +1,9 @@
+[submodule "amplifier"]
+	path = amplifier
+	url = https://github.com/microsoft/amplifier.git
+[submodule "amplifier-core"]
+	path = amplifier-core
+	url = https://github.com/microsoft/amplifier-core.git
+[submodule "amplifier-foundation"]
+	path = amplifier-foundation
+	url = https://github.com/microsoft/amplifier-foundation.git
