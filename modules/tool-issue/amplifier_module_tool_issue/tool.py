@@ -20,21 +20,23 @@ class IssueTool:
     """Tool for issue management operations with embedded state."""
 
     name = "issue_manager"
-    description = "Manage issues in the persistent issue queue with dependency tracking"
+    description = "Manage issues in the persistent issue queue with dependency tracking and session linking"
 
-    def __init__(self, coordinator: ModuleCoordinator, data_dir: Path, actor: str):
+    def __init__(self, coordinator: ModuleCoordinator, data_dir: Path, actor: str, session_id: str | None = None):
         """Initialize issue tool with embedded IssueManager.
 
         Args:
             coordinator: Module coordinator (for hooks integration)
             data_dir: Directory for JSONL storage
             actor: Default actor for events
+            session_id: Amplifier session ID for session linking
         """
         self.coordinator = coordinator
+        self.session_id = session_id
 
-        # Create embedded IssueManager instance
-        self.issue_manager = IssueManager(data_dir=data_dir, actor=actor)
-        logger.debug(f"Created embedded IssueManager at {data_dir}")
+        # Create embedded IssueManager instance with session tracking
+        self.issue_manager = IssueManager(data_dir=data_dir, actor=actor, session_id=session_id)
+        logger.debug(f"Created embedded IssueManager at {data_dir} with session_id={session_id}")
 
     @property
     def input_schema(self) -> dict:
@@ -44,7 +46,7 @@ class IssueTool:
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["create", "list", "get", "update", "close", "add_dependency", "get_ready", "get_blocked"],
+                    "enum": ["create", "list", "get", "update", "close", "add_dependency", "get_ready", "get_blocked", "get_sessions"],
                     "description": "Operation to perform",
                 },
                 "params": {
@@ -80,6 +82,8 @@ class IssueTool:
                 result = await self._get_ready_issues(params)
             elif operation == "get_blocked":
                 result = await self._get_blocked_issues(params)
+            elif operation == "get_sessions":
+                result = await self._get_sessions(params)
             else:
                 return ToolResult(success=False, error={"message": f"Unknown operation: {operation}"})
 
@@ -181,3 +185,22 @@ class IssueTool:
             ],
             "count": len(blocked),
         }
+
+    async def _get_sessions(self, params: dict) -> dict:
+        """Get all Amplifier sessions that have touched an issue.
+
+        This enables session linking - finding which sessions created, updated,
+        claimed, or closed an issue, so users can resume sessions for follow-up
+        questions with full context.
+
+        Args:
+            params: Must contain issue_id
+
+        Returns:
+            Dict with linked_sessions list and hint for resuming sessions
+        """
+        issue_id = params.get("issue_id")
+        if not issue_id:
+            raise ValueError("issue_id is required")
+
+        return self.issue_manager.get_issue_sessions(issue_id)

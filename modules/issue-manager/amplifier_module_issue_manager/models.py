@@ -105,18 +105,20 @@ class IssueEvent:
     """Event record for issue changes.
 
     Tracks all modifications to issues for audit and observability.
+    Includes session_id for linking issues to Amplifier sessions.
     """
 
     id: str
     issue_id: str
-    event_type: str  # created|updated|closed|blocked|unblocked
+    event_type: str  # created|updated|closed|blocked|unblocked|session_ended
     actor: str
     changes: dict[str, Any]
     timestamp: datetime
+    session_id: str | None = None  # Amplifier session that triggered this event
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        return {
+        result = {
             "id": self.id,
             "issue_id": self.issue_id,
             "event_type": self.event_type,
@@ -124,6 +126,9 @@ class IssueEvent:
             "changes": self.changes,
             "timestamp": self.timestamp.isoformat(),
         }
+        if self.session_id is not None:
+            result["session_id"] = self.session_id
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "IssueEvent":
@@ -135,4 +140,5 @@ class IssueEvent:
             actor=data["actor"],
             changes=data["changes"],
             timestamp=datetime.fromisoformat(data["timestamp"]),
+            session_id=data.get("session_id"),
         )

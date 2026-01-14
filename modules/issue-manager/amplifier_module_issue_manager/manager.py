@@ -16,21 +16,23 @@ from .storage import Storage
 
 
 class IssueManager:
-    """Issue manager with CRUD, dependencies, and scheduling.
+    """Issue manager with CRUD, dependencies, scheduling, and session linking.
 
     Provides a simple interface for managing issues with dependencies,
-    priority-based scheduling, and event tracking.
+    priority-based scheduling, event tracking, and Amplifier session linking.
     """
 
-    def __init__(self, data_dir: Path, actor: str = "system"):
+    def __init__(self, data_dir: Path, actor: str = "system", session_id: str | None = None):
         """Initialize issue manager.
 
         Args:
             data_dir: Directory for JSONL storage
             actor: Default actor for events
+            session_id: Amplifier session ID for linking issues to sessions
         """
         self.data_dir = data_dir
         self.actor = actor
+        self.session_id = session_id
         self.storage = Storage(data_dir)
         self.index = IssueIndex()
 
@@ -57,7 +59,7 @@ class IssueManager:
         self.storage.save_dependencies(deps)
 
     def _emit_event(self, issue_id: str, event_type: str, changes: dict[str, Any]) -> None:
-        """Emit an issue event.
+        """Emit an issue event with session tracking.
 
         Args:
             issue_id: Issue ID
@@ -71,6 +73,7 @@ class IssueManager:
             actor=self.actor,
             changes=changes,
             timestamp=datetime.now(),
+            session_id=self.session_id,
         )
         self.storage.append_event(event)
 
@@ -392,3 +395,59 @@ class IssueManager:
         """
         all_events = self.storage.load_events()
         return [e for e in all_events if e.issue_id == issue_id]
+
+    def get_issue_sessions(self, issue_id: str) -> dict[str, Any]:
+        """Get all Amplifier sessions that have touched an issue.
+
+        This enables session linking - finding which sessions created, updated,
+        claimed, or closed an issue, so users can resume sessions for follow-up
+        questions with full context.
+
+        Args:
+            issue_id: Issue ID
+
+        Returns:
+            Dict with:
+                - issue_id: The issue ID
+                - linked_sessions: List of unique session IDs
+                - session_count: Number of sessions
+                - events_by_session: Dict mapping session_id to list of event types
+                - hint: How to resume a session
+
+        Raises:
+            ValueError: If issue not found
+        """
+        if not self.index.get_issue(issue_id):
+            raise ValueError(f"Issue not found: {issue_id}")
+
+        events = self.get_issue_events(issue_id)
+
+        # Collect sessions and their event types
+        sessions: dict[str, list[str]] = {}
+        for event in events:
+            if event.session_id:
+                if event.session_id not in sessions:
+                    sessions[event.session_id] = []
+                sessions[event.session_id].append(event.event_type)
+
+        return {
+            "issue_id": issue_id,
+            "linked_sessions": sorted(sessions.keys()),
+            "session_count": len(sessions),
+            "events_by_session": sessions,
+            "hint": "Use 'amplifier session resume <session_id>' to revive context for follow-up questions",
+        }
+
+    def emit_session_ended(self, issue_id: str) -> None:
+        """Emit a session_ended event for an issue.
+
+        Called when an Amplifier session ends with an issue still in_progress.
+        This provides continuity by recording session boundaries.
+
+        Args:
+            issue_id: Issue ID
+        """
+        if not self.index.get_issue(issue_id):
+            return  # Silently ignore if issue doesn't exist
+
+        self._emit_event(issue_id, "session_ended", {"reason": "session terminated"})
