@@ -54,6 +54,9 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     config = config or {}
     actor = config.get("actor", "assistant")
 
+    # Get session_id from coordinator config for session linking
+    session_id = coordinator.config.get("session_id")
+
     # Get base directory with ~ expansion
     base_dir = Path(config.get("data_dir", "~/.amplifier/projects")).expanduser()
 
@@ -68,8 +71,8 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     if config.get("auto_create_dir", True):
         data_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create tool with embedded IssueManager
-    tool = IssueTool(coordinator, data_dir=data_dir, actor=actor)
+    # Create tool with embedded IssueManager and session linking
+    tool = IssueTool(coordinator, data_dir=data_dir, actor=actor, session_id=session_id)
     await coordinator.mount("tools", tool, name=tool.name)
-    logger.info(f"Mounted issue management tool with data_dir={data_dir}")
+    logger.info(f"Mounted issue management tool with data_dir={data_dir}, session_id={session_id}")
     return
