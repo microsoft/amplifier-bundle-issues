@@ -10,7 +10,7 @@ git = "https://github.com/microsoft/amplifier-core"
 branch = "main"
 
 [tool.uv.sources.amplifier-module-issue-manager]
-git = "https://github.com/microsoft/amplifier-collection-issues"
+git = "https://github.com/microsoft/amplifier-bundle-issues"
 subdirectory = "modules/issue-manager"
 branch = "main"
 
