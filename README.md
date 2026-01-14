@@ -11,16 +11,17 @@ Persistent issue tracking for Amplifier sessions with dependency management and 
 
 ### Quick Start
 
-Run Amplifier with the issues bundle directly:
+Add and activate the issues bundle:
 
 ```bash
-amplifier run --bundle git+https://github.com/microsoft/amplifier-bundle-issues@main
-```
+# Add the bundle to your registry
+amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-issues@main
 
-Or from a local path:
+# Set it as active
+amplifier bundle use issues
 
-```bash
-amplifier run --bundle ./bundle.md
+# Start an interactive session
+amplifier
 ```
 
 Then interact with issues:
@@ -100,6 +101,7 @@ The issue_manager tool supports:
 - **get_blocked** - See blocked issues
 - **add_dep** - Link issues with dependencies
 - **remove_dep** - Remove dependency links
+- **get_sessions** - Get all Amplifier sessions linked to an issue
 
 ## Issue States
 
@@ -107,6 +109,24 @@ The issue_manager tool supports:
 - **in_progress** - Actively being worked on
 - **blocked** - Waiting on dependencies
 - **closed** - Completed
+
+## Session Linking
+
+Issues are automatically linked to Amplifier sessions. Every operation (create, update, close, etc.) records the session ID, enabling you to:
+
+- **Track which sessions worked on an issue** - See the full history of sessions that touched an issue
+- **Resume sessions for follow-up questions** - Use `amplifier session resume <session_id>` to revive context
+- **Understand issue history** - See what each session did (created, updated, closed, etc.)
+
+Query linked sessions:
+
+```
+You: "What sessions have worked on issue X?"
+Assistant: [Uses get_sessions operation to show linked sessions]
+
+You: "Resume the session that created this issue"
+Assistant: [You can run: amplifier session resume <session_id>]
+```
 
 ## Priorities
 
