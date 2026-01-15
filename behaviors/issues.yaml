@@ -16,6 +16,13 @@ tools:
       actor: assistant
 
 hooks:
+  - module: hook-issue-session-start
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-session-start
+    config:
+      priority: 5
+      nudge_interval: 10
+      inject_role: user
+
   - module: hook-issue-auto-work
     source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-auto-work
     config:
