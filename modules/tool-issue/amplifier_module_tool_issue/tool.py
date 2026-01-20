@@ -6,6 +6,9 @@ Pure-module implementation requiring zero kernel changes.
 """
 
 import logging
+import re
+import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +25,13 @@ class IssueTool:
     name = "issue_manager"
     description = "Manage issues in the persistent issue queue with dependency tracking and session linking"
 
-    def __init__(self, coordinator: ModuleCoordinator, data_dir: Path, actor: str, session_id: str | None = None):
+    def __init__(
+        self,
+        coordinator: ModuleCoordinator,
+        data_dir: Path,
+        actor: str,
+        session_id: str | None = None,
+    ):
         """Initialize issue tool with embedded IssueManager.
 
         Args:
@@ -35,8 +44,12 @@ class IssueTool:
         self.session_id = session_id
 
         # Create embedded IssueManager instance with session tracking
-        self.issue_manager = IssueManager(data_dir=data_dir, actor=actor, session_id=session_id)
-        logger.debug(f"Created embedded IssueManager at {data_dir} with session_id={session_id}")
+        self.issue_manager = IssueManager(
+            data_dir=data_dir, actor=actor, session_id=session_id
+        )
+        logger.debug(
+            f"Created embedded IssueManager at {data_dir} with session_id={session_id}"
+        )
 
     @property
     def input_schema(self) -> dict:
@@ -46,7 +59,18 @@ class IssueTool:
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["create", "list", "get", "update", "close", "add_dependency", "get_ready", "get_blocked", "get_sessions"],
+                    "enum": [
+                        "create",
+                        "list",
+                        "get",
+                        "update",
+                        "close",
+                        "add_dependency",
+                        "get_ready",
+                        "get_blocked",
+                        "get_sessions",
+                        "sync_to_github",
+                    ],
                     "description": "Operation to perform",
                 },
                 "params": {
@@ -84,14 +108,20 @@ class IssueTool:
                 result = await self._get_blocked_issues(params)
             elif operation == "get_sessions":
                 result = await self._get_sessions(params)
+            elif operation == "sync_to_github":
+                result = await self._sync_to_github(params)
             else:
-                return ToolResult(success=False, error={"message": f"Unknown operation: {operation}"})
+                return ToolResult(
+                    success=False, error={"message": f"Unknown operation: {operation}"}
+                )
 
             return ToolResult(success=True, output=result)
 
         except Exception as e:
             logger.error(f"Issue operation '{operation}' failed: {e}")
-            return ToolResult(success=False, error={"message": f"Operation failed: {str(e)}"})
+            return ToolResult(
+                success=False, error={"message": f"Operation failed: {str(e)}"}
+            )
 
     async def _create_issue(self, params: dict) -> dict:
         """Create a new issue."""
@@ -109,8 +139,17 @@ class IssueTool:
         filtered_params = {k: v for k, v in params.items() if k in allowed_params}
 
         # Convert priority string to int
-        if "priority" in filtered_params and isinstance(filtered_params["priority"], str):
-            priority_map = {"critical": 0, "high": 1, "medium": 2, "normal": 2, "low": 3, "deferred": 4}
+        if "priority" in filtered_params and isinstance(
+            filtered_params["priority"], str
+        ):
+            priority_map = {
+                "critical": 0,
+                "high": 1,
+                "medium": 2,
+                "normal": 2,
+                "low": 3,
+                "deferred": 4,
+            }
             priority_str = filtered_params["priority"].lower()
             if priority_str in priority_map:
                 filtered_params["priority"] = priority_map[priority_str]
@@ -118,7 +157,9 @@ class IssueTool:
                 try:
                     filtered_params["priority"] = int(filtered_params["priority"])
                 except ValueError:
-                    raise ValueError(f"Invalid priority value: {filtered_params['priority']}")
+                    raise ValueError(
+                        f"Invalid priority value: {filtered_params['priority']}"
+                    )
 
         issue = self.issue_manager.create_issue(**filtered_params)
         return {"issue": issue.to_dict()}
@@ -148,7 +189,14 @@ class IssueTool:
 
         # Convert priority if it's a string
         if "priority" in params and isinstance(params["priority"], str):
-            priority_map = {"critical": 0, "high": 1, "medium": 2, "normal": 2, "low": 3, "deferred": 4}
+            priority_map = {
+                "critical": 0,
+                "high": 1,
+                "medium": 2,
+                "normal": 2,
+                "low": 3,
+                "deferred": 4,
+            }
             priority_str = params["priority"].lower()
             if priority_str in priority_map:
                 params["priority"] = priority_map[priority_str]
@@ -181,7 +229,8 @@ class IssueTool:
         blocked = self.issue_manager.get_blocked_issues()
         return {
             "blocked_issues": [
-                {"issue": issue.to_dict(), "blockers": [b.to_dict() for b in blockers]} for issue, blockers in blocked
+                {"issue": issue.to_dict(), "blockers": [b.to_dict() for b in blockers]}
+                for issue, blockers in blocked
             ],
             "count": len(blocked),
         }
@@ -204,3 +253,160 @@ class IssueTool:
             raise ValueError("issue_id is required")
 
         return self.issue_manager.get_issue_sessions(issue_id)
+
+    async def _sync_to_github(self, params: dict) -> dict:
+        """Sync local issues to GitHub.
+
+        For each local issue not yet synced:
+        1. Create GitHub issue with structured labels
+        2. Store GitHub issue number in local metadata
+        3. Return summary of synced issues
+
+        Args:
+            params: Optional filters and config
+                - repo: GitHub repo (default: microsoft-amplifier/amplifier-shared)
+                - include_closed: Sync closed issues (default: False)
+
+        Returns:
+            Dict with synced issues, counts, and any errors
+        """
+        # Get repo from config or params
+        repo = params.get("repo", "microsoft-amplifier/amplifier-shared")
+
+        # Get issues to sync (default: all non-synced)
+        all_issues = self.issue_manager.list_issues()
+
+        synced = []
+        skipped = []
+        errors = []
+
+        for issue in all_issues:
+            # Skip if already synced
+            if issue.metadata and issue.metadata.get("github_issue_number"):
+                skipped.append(issue.issue_id)
+                continue
+
+            # Skip closed issues unless explicitly requested
+            if issue.status == "closed" and not params.get("include_closed", False):
+                skipped.append(issue.issue_id)
+                continue
+
+            try:
+                gh_number = await self._create_github_issue(issue, repo)
+
+                # Update local issue with GitHub metadata
+                updated_metadata = issue.metadata.copy() if issue.metadata else {}
+                updated_metadata.update(
+                    {
+                        "github_issue_number": gh_number,
+                        "github_repo": repo,
+                        "synced_at": datetime.now().isoformat(),
+                    }
+                )
+
+                self.issue_manager.update_issue(
+                    issue.issue_id, metadata=updated_metadata
+                )
+
+                synced.append(
+                    {
+                        "issue_id": issue.issue_id,
+                        "github_number": gh_number,
+                        "github_url": f"https://github.com/{repo}/issues/{gh_number}",
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to sync issue {issue.issue_id}: {e}")
+                errors.append({"issue_id": issue.issue_id, "error": str(e)})
+
+        return {
+            "synced": synced,
+            "synced_count": len(synced),
+            "skipped_count": len(skipped),
+            "errors": errors,
+            "error_count": len(errors),
+        }
+
+    async def _create_github_issue(self, issue, repo: str) -> int:
+        """Create GitHub issue from local issue.
+
+        Args:
+            issue: Local Issue object
+            repo: GitHub repo in org/name format
+
+        Returns:
+            GitHub issue number
+
+        Raises:
+            ValueError: If issue number cannot be parsed
+            subprocess.CalledProcessError: If gh command fails
+        """
+
+        # Map priority to label
+        priority_labels = {
+            0: "priority:critical",
+            1: "priority:high",
+            2: "priority:normal",
+            3: "priority:low",
+            4: "priority:deferred",
+        }
+
+        # Map status to label
+        status_labels = {
+            "open": "status:open",
+            "in_progress": "status:in-progress",
+            "blocked": "status:blocked",
+            "closed": "status:closed",
+        }
+
+        # Build labels
+        labels = [
+            status_labels.get(issue.status, "status:open"),
+            priority_labels.get(issue.priority, "priority:normal"),
+        ]
+
+        # Add area label if in metadata
+        if issue.metadata and "area" in issue.metadata:
+            labels.append(f"area:{issue.metadata['area']}")
+
+        # Format body
+        body = f"""**Description**
+{issue.description or "No description provided"}
+
+**Created**: {issue.created_at}
+**Session**: {issue.session_id or "N/A"}
+**Local Issue ID**: {issue.issue_id}
+
+---
+*Synced from Amplifier local issue tracker*
+"""
+
+        # Build gh command
+        cmd = [
+            "gh",
+            "issue",
+            "create",
+            "--repo",
+            repo,
+            "--title",
+            issue.title,
+            "--body",
+            body,
+            "--label",
+            ",".join(labels),
+        ]
+
+        if issue.assignee:
+            cmd.extend(["--assignee", issue.assignee])
+
+        # Execute
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Parse issue number from URL
+        # Format: "https://github.com/org/repo/issues/42"
+        match = re.search(r"/issues/(\d+)", result.stdout)
+        if match:
+            return int(match.group(1))
+        else:
+            raise ValueError(f"Could not parse issue number from: {result.stdout}")

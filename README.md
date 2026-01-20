@@ -1,10 +1,12 @@
 # Issues Amplifier Bundle
 
-Persistent issue tracking for Amplifier sessions with dependency management and priority-based scheduling.
+Persistent issue tracking for Amplifier sessions with dependency management, priority-based scheduling, GitHub sync, and team visibility.
 
 ## What This Provides
 
 - **issue_manager tool** - Create, list, update, and close issues with dependencies
+- **GitHub sync** - Sync local issues to GitHub for team visibility
+- **issue-tracking agent** - Query and analyze team work patterns
 - **issue-aware bundle** - Pre-configured session with issue management enabled
 
 ## Usage
@@ -102,6 +104,7 @@ The issue_manager tool supports:
 - **add_dep** - Link issues with dependencies
 - **remove_dep** - Remove dependency links
 - **get_sessions** - Get all Amplifier sessions linked to an issue
+- **sync_to_github** - Sync local issues to GitHub for team visibility (NEW!)
 
 ## Issue States
 
@@ -127,6 +130,102 @@ Assistant: [Uses get_sessions operation to show linked sessions]
 You: "Resume the session that created this issue"
 Assistant: [You can run: amplifier session resume <session_id>]
 ```
+
+## Team Visibility (NEW!)
+
+### GitHub Sync
+
+Sync your local issues to GitHub for team visibility:
+
+```
+You: "Sync my issues to GitHub"
+Assistant: [Syncs local issues to microsoft-amplifier/amplifier-shared]
+```
+
+Issues are synced with:
+- Structured labels (status, area, priority)
+- Session links preserved in issue body
+- Local JSONL remains source of truth
+- GitHub issue number stored in local metadata
+
+**What gets synced:**
+- All open and in-progress issues (by default)
+- Closed issues only if you specify `include_closed: true`
+- Only issues not already synced (idempotent)
+
+**Example sync output:**
+```json
+{
+  "synced": [
+    {
+      "issue_id": "issue_1737403800_abc123",
+      "github_number": 42,
+      "github_url": "https://github.com/microsoft-amplifier/amplifier-shared/issues/42"
+    }
+  ],
+  "synced_count": 1,
+  "skipped_count": 3,
+  "errors": [],
+  "error_count": 0
+}
+```
+
+### Team Queries
+
+Ask questions about team work using the **issue-tracking agent**:
+
+```
+You: "What did we accomplish last week?"
+You: "Who's working on Core?"
+You: "What's blocked?"
+You: "Is anyone working on something similar to session optimization?"
+```
+
+The agent:
+- Queries GitHub issues via `gh` CLI
+- Interprets results with LLM
+- Returns structured, readable summaries
+- Groups by person, area, or priority as appropriate
+- Detects duplicate work before you create issues
+
+**Example query response:**
+
+```
+# Team Accomplishments (Last Week)
+
+## Summary
+The team closed 8 issues, focusing on Core refactoring and Foundation improvements.
+
+## By Person
+
+### @robotdad (4 issues)
+- **Core**: Refactored session analyzer (#42) - Reduced memory usage by 60%
+- **Core**: Fixed event logging race condition (#38)
+- **Foundation**: Updated bundle composition docs (#45)
+- **Modules**: Released tool-stats v1.2 (#47)
+
+### @malicata (3 issues)
+- **Bundles**: Created design-intelligence bundle (#50)
+- **Foundation**: Added recipe validation (#49)
+- **Core**: Improved error messages (#44)
+
+## Highlights
+- 🎯 High priority: Session analyzer refactoring completed
+- 🚀 New capability: design-intelligence bundle shipped
+```
+
+### Configuration
+
+**GitHub repo**: Default is `microsoft-amplifier/amplifier-shared`. Override in sync params:
+
+```
+You: "Sync issues to GitHub repo my-org/my-work-tracker"
+```
+
+**Prerequisites:**
+- GitHub CLI installed (`gh --version`)
+- Authenticated with GitHub (`gh auth login`)
+- Write access to target repository
 
 ## Priorities
 
