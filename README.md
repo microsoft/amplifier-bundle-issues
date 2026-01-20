@@ -131,6 +131,138 @@ You: "Resume the session that created this issue"
 Assistant: [You can run: amplifier session resume <session_id>]
 ```
 
+## Hook Architecture
+
+This bundle uses **Amplifier hooks** to provide automatic issue tracking behaviors. Hooks subscribe to kernel events and inject context or emit tracking events without blocking the main execution flow.
+
+### Available Hooks
+
+| Hook | Purpose | Events |
+|------|---------|--------|
+| **hook-issue-session-start** | Surface open issues at session start and provide periodic reminders | `session:start`, `tool:post`, `provider:request` |
+| **hook-issue-session-end** | Mark issues when sessions end for continuity tracking | `session:end` |
+| **hook-issue-auto-work** | Autonomously continue working through the issue queue | `prompt:complete` |
+
+### Event Triggers
+
+#### hook-issue-session-start
+
+Provides awareness of open issues throughout the session:
+
+**On `session:start` (priority 5)**
+- Fires when an Amplifier session begins
+- Surfaces summary of open issues grouped by status
+- Injects context: "This project has N open issues..."
+- Only shows first 5 per status to avoid overwhelming
+
+**On `tool:post` (priority 5)**
+- Fires after any tool executes
+- Tracks tool usage to detect recent `issue_manager` activity
+- No output - silent tracking only
+
+**On `provider:request` (priority 15)**
+- Fires before each LLM call
+- Gentle nudge every 10 requests if issues exist but haven't been checked
+- Only triggers if `issue_manager` wasn't used recently
+- Avoids being annoying with interval-based gating
+
+**Configuration:**
+```yaml
+hooks:
+  - module: hook-issue-session-start
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-session-start
+    config:
+      priority: 5                    # Hook execution order
+      nudge_interval: 10             # Requests between reminders
+      inject_role: user              # Context injection role
+```
+
+#### hook-issue-session-end
+
+Provides continuity tracking when work is interrupted:
+
+**On `session:end` (priority 90)**
+- Fires when an Amplifier session terminates
+- Finds in-progress issues touched by this session
+- Emits `session_ended` events for each touched issue
+- Enables resuming work context later
+
+**Configuration:**
+```yaml
+hooks:
+  - module: hook-issue-session-end
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-session-end
+    config:
+      priority: 90                   # Runs late to see full session
+      enabled: true                  # Can disable if not wanted
+```
+
+#### hook-issue-auto-work
+
+Enables autonomous work through the issue queue:
+
+**On `prompt:complete` (priority 100)**
+- Fires after each turn completes
+- Checks for ready issues via `issue_manager.get_ready()`
+- If ready work exists, injects context to continue autonomously
+- Safety limit: max 10 auto-iterations before requiring user check-in
+- Resets counter when no work remains
+
+**Configuration:**
+```yaml
+hooks:
+  - module: hook-issue-auto-work
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-auto-work
+    config:
+      priority: 100                  # Runs late to see full turn
+      max_auto_iterations: 10        # Safety limit
+      inject_role: system            # Context injection role
+```
+
+### Event Flow
+
+```
+Session Start
+  └─> session:start
+      └─> hook-issue-session-start shows: "You have 3 open issues"
+
+During Work
+  └─> tool:post (after each tool call)
+      └─> hook-issue-session-start tracks tool usage
+  
+  └─> provider:request (every 10 LLM calls)
+      └─> hook-issue-session-start nudges if no issue_manager usage
+
+Turn Complete
+  └─> prompt:complete
+      └─> hook-issue-auto-work checks for ready work
+          └─> If found: injects "Continue with next issue"
+          └─> If none: resets counter and waits
+
+Session End
+  └─> session:end
+      └─> hook-issue-session-end marks in-progress issues
+```
+
+### Autonomous Work Loop
+
+When `hook-issue-auto-work` is enabled, the assistant works autonomously through your issue queue:
+
+1. **User creates issues** - Break down complex work into trackable issues
+2. **Assistant picks ready work** - `get_ready` finds highest priority issue with no blockers
+3. **Work completes** - Issue marked as closed
+4. **Hook checks for more** - `prompt:complete` event triggers ready work check
+5. **Loop continues** - If ready work exists, assistant automatically continues
+6. **Safety limit** - After 10 iterations, requires user check-in to prevent infinite loops
+7. **User engagement** - When no ready work, control returns to user
+
+**Stopping the loop:**
+- All issues completed or blocked
+- Max auto-iterations reached (default: 10)
+- User provides new input at any time
+
+This enables "fire and forget" issue-driven development - create issues, let the assistant work through them autonomously.
+
 ## Team Visibility (NEW!)
 
 ### GitHub Sync
