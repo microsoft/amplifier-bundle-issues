@@ -254,6 +254,141 @@ class IssueTool:
 
         return self.issue_manager.get_issue_sessions(issue_id)
 
+    async def _verify_github_permissions(self, repo: str) -> dict:
+        """Verify user has permissions to create issues in the GitHub repo.
+
+        Args:
+            repo: GitHub repo in org/name format
+
+        Returns:
+            Dict with success status and error message if failed
+        """
+        # Check if gh CLI is installed
+        try:
+            result = subprocess.run(
+                ["gh", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                return {
+                    "success": False,
+                    "error": "GitHub CLI (gh) is not installed. Install with: brew install gh (macOS) or see https://cli.github.com/",
+                }
+        except FileNotFoundError:
+            return {
+                "success": False,
+                "error": "GitHub CLI (gh) is not installed. Install with: brew install gh (macOS) or see https://cli.github.com/",
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": "GitHub CLI check timed out. Please verify gh is working correctly.",
+            }
+
+        # Check if authenticated
+        try:
+            result = subprocess.run(
+                ["gh", "auth", "status"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                return {
+                    "success": False,
+                    "error": "Not authenticated with GitHub. Run: gh auth login",
+                }
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": "GitHub authentication check timed out. Please verify gh is working correctly.",
+            }
+
+        # Check if user has write access to the repo
+        try:
+            # Try to list issues - this requires read access at minimum
+            result = subprocess.run(
+                ["gh", "issue", "list", "--repo", repo, "--limit", "1", "--json", "number"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr.strip()
+
+                # Parse common error scenarios
+                if "404" in error_msg or "not found" in error_msg.lower():
+                    return {
+                        "success": False,
+                        "error": f"Repository '{repo}' not found or you don't have access. Please verify:\n"
+                        f"  1. The repository exists\n"
+                        f"  2. You have access to it\n"
+                        f"  3. You may need to request access from the repository owner",
+                    }
+                elif "403" in error_msg or "forbidden" in error_msg.lower():
+                    return {
+                        "success": False,
+                        "error": f"Access forbidden to repository '{repo}'. You don't have permission to access this repository.\n"
+                        f"Please request access from the repository owner.",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Failed to access repository '{repo}': {error_msg}\n"
+                        f"You may need to request access from the repository owner.",
+                    }
+
+            # We can read issues, but we need write access to create them
+            # Try to get repo info to check permissions
+            result = subprocess.run(
+                ["gh", "repo", "view", repo, "--json", "viewerPermission"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+
+            if result.returncode == 0:
+                import json
+
+                try:
+                    repo_info = json.loads(result.stdout)
+                    permission = repo_info.get("viewerPermission", "").lower()
+
+                    # Check if user has write, maintain, or admin permission
+                    if permission in ["write", "maintain", "admin"]:
+                        return {"success": True}
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"You have '{permission}' access to '{repo}', but 'write' access is required to create issues.\n"
+                            f"Please request write access from the repository owner.",
+                        }
+                except (json.JSONDecodeError, KeyError):
+                    # If we can't parse permissions, assume they have access
+                    # (they were able to list issues)
+                    logger.warning(
+                        f"Could not parse repo permissions for {repo}, assuming access is OK"
+                    )
+                    return {"success": True}
+
+            # If repo view failed but we could list issues, assume it's OK
+            return {"success": True}
+
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": "GitHub repository access check timed out. Please verify your connection and try again.",
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error checking GitHub permissions: {e}")
+            return {
+                "success": False,
+                "error": f"Could not verify repository access: {str(e)}",
+            }
+
     async def _sync_to_github(self, params: dict) -> dict:
         """Sync local issues to GitHub.
 
@@ -272,6 +407,18 @@ class IssueTool:
         """
         # Get repo from config or params
         repo = params.get("repo", "microsoft-amplifier/amplifier-shared")
+
+        # Verify permissions before attempting sync
+        permission_check = await self._verify_github_permissions(repo)
+        if not permission_check["success"]:
+            return {
+                "synced": [],
+                "synced_count": 0,
+                "skipped_count": 0,
+                "errors": [{"error": permission_check["error"]}],
+                "error_count": 1,
+                "permission_denied": True,
+            }
 
         # Get issues to sync (default: all non-synced)
         all_issues = self.issue_manager.list_issues()

@@ -5,6 +5,9 @@ description = "Issue management tool module for Amplifier"
 requires-python = ">=3.11"
 dependencies = ["amplifier-core", "amplifier-module-issue-manager"]
 
+[project.optional-dependencies]
+test = ["pytest>=7.0.0", "pytest-asyncio>=0.21.0"]
+
 [tool.uv.sources.amplifier-core]
 git = "https://github.com/microsoft/amplifier-core"
 branch = "main"
