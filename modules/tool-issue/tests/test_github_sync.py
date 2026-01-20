@@ -94,93 +94,106 @@ class TestSyncToGitHub:
         self, issue_tool, mock_issue_manager
     ):
         """Test that already synced issues are skipped."""
-        with patch.object(issue_tool, "_create_github_issue"):
-            result = await issue_tool._sync_to_github({"repo": "test/repo"})
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue"):
+                mock_verify.return_value = {"success": True}
+                
+                result = await issue_tool._sync_to_github({"repo": "test/repo"})
 
-            # Should not create GitHub issue for issue_3 (already synced)
-            assert result["skipped_count"] == 2  # issue_3 (synced) + issue_4 (closed)
-            assert result["synced_count"] == 2  # issue_1 + issue_2
+                # Should not create GitHub issue for issue_3 (already synced)
+                assert result["skipped_count"] == 2  # issue_3 (synced) + issue_4 (closed)
+                assert result["synced_count"] == 2  # issue_1 + issue_2
 
     @pytest.mark.asyncio
     async def test_sync_skips_closed_issues_by_default(
         self, issue_tool, mock_issue_manager
     ):
         """Test that closed issues are skipped unless include_closed=True."""
-        with patch.object(issue_tool, "_create_github_issue") as mock_create:
-            mock_create.return_value = 100
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue") as mock_create:
+                mock_verify.return_value = {"success": True}
+                mock_create.return_value = 100
 
-            result = await issue_tool._sync_to_github({"repo": "test/repo"})
+                result = await issue_tool._sync_to_github({"repo": "test/repo"})
 
-            # Should skip closed issue (issue_4)
-            assert result["synced_count"] == 2  # Only open/in-progress
-            assert result["skipped_count"] == 2  # issue_3 (synced) + issue_4 (closed)
+                # Should skip closed issue (issue_4)
+                assert result["synced_count"] == 2  # Only open/in-progress
+                assert result["skipped_count"] == 2  # issue_3 (synced) + issue_4 (closed)
 
     @pytest.mark.asyncio
     async def test_sync_includes_closed_when_requested(
         self, issue_tool, mock_issue_manager
     ):
         """Test that closed issues are synced when include_closed=True."""
-        with patch.object(issue_tool, "_create_github_issue") as mock_create:
-            mock_create.return_value = 100
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue") as mock_create:
+                mock_verify.return_value = {"success": True}
+                mock_create.return_value = 100
 
-            result = await issue_tool._sync_to_github(
-                {"repo": "test/repo", "include_closed": True}
-            )
+                result = await issue_tool._sync_to_github(
+                    {"repo": "test/repo", "include_closed": True}
+                )
 
-            # Should include closed issue
-            assert result["synced_count"] == 3  # issue_1, issue_2, issue_4
-            assert result["skipped_count"] == 1  # Only issue_3 (already synced)
+                # Should include closed issue
+                assert result["synced_count"] == 3  # issue_1, issue_2, issue_4
+                assert result["skipped_count"] == 1  # Only issue_3 (already synced)
 
     @pytest.mark.asyncio
     async def test_sync_updates_local_metadata(self, issue_tool, mock_issue_manager):
         """Test that local issues get GitHub metadata after sync."""
-        with patch.object(issue_tool, "_create_github_issue") as mock_create:
-            mock_create.return_value = 99
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue") as mock_create:
+                mock_verify.return_value = {"success": True}
+                mock_create.return_value = 99
 
-            await issue_tool._sync_to_github({"repo": "test/repo"})
+                await issue_tool._sync_to_github({"repo": "test/repo"})
 
-            # Should update metadata with GitHub info
-            calls = mock_issue_manager.update_issue.call_args_list
-            assert len(calls) == 2  # Updated issue_1 and issue_2
+                # Should update metadata with GitHub info
+                calls = mock_issue_manager.update_issue.call_args_list
+                assert len(calls) == 2  # Updated issue_1 and issue_2
 
-            # Check metadata update for first issue
-            first_call = calls[0]
-            metadata = first_call[1]["metadata"]
+                # Check metadata update for first issue
+                first_call = calls[0]
+                metadata = first_call[1]["metadata"]
 
-            assert metadata["github_issue_number"] == 99
+                assert metadata["github_issue_number"] == 99
             assert metadata["github_repo"] == "test/repo"
             assert "synced_at" in metadata
 
     @pytest.mark.asyncio
     async def test_sync_handles_errors_gracefully(self, issue_tool, mock_issue_manager):
         """Test that sync continues after errors and reports them."""
-        with patch.object(issue_tool, "_create_github_issue") as mock_create:
-            # First call succeeds, second fails
-            mock_create.side_effect = [99, Exception("GitHub API error")]
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue") as mock_create:
+                mock_verify.return_value = {"success": True}
+                # First call succeeds, second fails
+                mock_create.side_effect = [99, Exception("GitHub API error")]
 
-            result = await issue_tool._sync_to_github({"repo": "test/repo"})
+                result = await issue_tool._sync_to_github({"repo": "test/repo"})
 
-            # Should have 1 success and 1 error
-            assert result["synced_count"] == 1
-            assert result["error_count"] == 1
-            assert len(result["errors"]) == 1
-            assert "GitHub API error" in result["errors"][0]["error"]
+                # Should have 1 success and 1 error
+                assert result["synced_count"] == 1
+                assert result["error_count"] == 1
+                assert len(result["errors"]) == 1
+                assert "GitHub API error" in result["errors"][0]["error"]
 
     @pytest.mark.asyncio
     async def test_sync_returns_github_urls(self, issue_tool, mock_issue_manager):
         """Test that sync returns GitHub URLs for synced issues."""
-        with patch.object(issue_tool, "_create_github_issue") as mock_create:
-            mock_create.return_value = 123
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue") as mock_create:
+                mock_verify.return_value = {"success": True}
+                mock_create.return_value = 123
 
-            result = await issue_tool._sync_to_github({"repo": "test/repo"})
+                result = await issue_tool._sync_to_github({"repo": "test/repo"})
 
-            # Check URLs are formatted correctly
-            assert len(result["synced"]) == 2
-            first_synced = result["synced"][0]
-            assert (
-                first_synced["github_url"] == "https://github.com/test/repo/issues/123"
-            )
-            assert first_synced["github_number"] == 123
+                # Check URLs are formatted correctly
+                assert len(result["synced"]) == 2
+                first_synced = result["synced"][0]
+                assert (
+                    first_synced["github_url"] == "https://github.com/test/repo/issues/123"
+                )
+                assert first_synced["github_number"] == 123
 
 
 class TestCreateGitHubIssue:
@@ -346,16 +359,18 @@ class TestSyncToGitHubIntegration:
     @pytest.mark.asyncio
     async def test_sync_operation_via_execute(self, issue_tool, mock_issue_manager):
         """Test sync_to_github operation through the execute interface."""
-        with patch.object(issue_tool, "_create_github_issue") as mock_create:
-            mock_create.return_value = 100
+        with patch.object(issue_tool, "_verify_github_permissions") as mock_verify:
+            with patch.object(issue_tool, "_create_github_issue") as mock_create:
+                mock_verify.return_value = {"success": True}
+                mock_create.return_value = 100
 
-            result = await issue_tool.execute(
-                {"operation": "sync_to_github", "params": {"repo": "test/repo"}}
-            )
+                result = await issue_tool.execute(
+                    {"operation": "sync_to_github", "params": {"repo": "test/repo"}}
+                )
 
-            assert result.success is True
-            assert "synced_count" in result.output
-            assert result.output["synced_count"] == 2
+                assert result.success is True
+                assert "synced_count" in result.output
+                assert result.output["synced_count"] == 2
 
     @pytest.mark.asyncio
     async def test_sync_operation_error_handling(self, issue_tool, mock_issue_manager):
