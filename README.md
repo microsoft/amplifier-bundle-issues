@@ -11,13 +11,23 @@ Persistent issue tracking for Amplifier sessions with dependency management and 
 
 ### Quick Start
 
-Add and activate the issues bundle:
+Add the issues bundle to your app configuration (always available):
+
+```bash
+amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-issues@main --app
+```
+
+That's it! The issue manager is now available in all your Amplifier sessions.
+
+### Alternative: Per-Project Activation
+
+If you prefer to enable issues only for specific projects:
 
 ```bash
 # Add the bundle to your registry
 amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-issues@main
 
-# Set it as active
+# Set it as active for the current project
 amplifier bundle use issues
 
 # Start an interactive session
