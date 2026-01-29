@@ -22,7 +22,13 @@ class IssueTool:
     name = "issue_manager"
     description = "Manage issues in the persistent issue queue with dependency tracking and session linking"
 
-    def __init__(self, coordinator: ModuleCoordinator, data_dir: Path, actor: str, session_id: str | None = None):
+    def __init__(
+        self,
+        coordinator: ModuleCoordinator,
+        data_dir: Path,
+        actor: str,
+        session_id: str | None = None,
+    ):
         """Initialize issue tool with embedded IssueManager.
 
         Args:
@@ -35,8 +41,12 @@ class IssueTool:
         self.session_id = session_id
 
         # Create embedded IssueManager instance with session tracking
-        self.issue_manager = IssueManager(data_dir=data_dir, actor=actor, session_id=session_id)
-        logger.debug(f"Created embedded IssueManager at {data_dir} with session_id={session_id}")
+        self.issue_manager = IssueManager(
+            data_dir=data_dir, actor=actor, session_id=session_id
+        )
+        logger.debug(
+            f"Created embedded IssueManager at {data_dir} with session_id={session_id}"
+        )
 
     @property
     def input_schema(self) -> dict:
@@ -46,12 +56,22 @@ class IssueTool:
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["create", "list", "get", "update", "close", "add_dependency", "get_ready", "get_blocked", "get_sessions"],
+                    "enum": [
+                        "create",
+                        "list",
+                        "get",
+                        "update",
+                        "close",
+                        "add_dependency",
+                        "get_ready",
+                        "get_blocked",
+                        "get_sessions",
+                    ],
                     "description": "Operation to perform",
                 },
                 "params": {
                     "type": "object",
-                    "description": "Parameters for the operation. Use issue_id to identify issues.",
+                    "description": "Parameters for the operation. Most operations use issue_id. For add_dependency, use from_id (blocked issue) and to_id (blocking issue).",
                 },
             },
             "required": ["operation"],
@@ -85,13 +105,17 @@ class IssueTool:
             elif operation == "get_sessions":
                 result = await self._get_sessions(params)
             else:
-                return ToolResult(success=False, error={"message": f"Unknown operation: {operation}"})
+                return ToolResult(
+                    success=False, error={"message": f"Unknown operation: {operation}"}
+                )
 
             return ToolResult(success=True, output=result)
 
         except Exception as e:
             logger.error(f"Issue operation '{operation}' failed: {e}")
-            return ToolResult(success=False, error={"message": f"Operation failed: {str(e)}"})
+            return ToolResult(
+                success=False, error={"message": f"Operation failed: {str(e)}"}
+            )
 
     async def _create_issue(self, params: dict) -> dict:
         """Create a new issue."""
@@ -109,8 +133,17 @@ class IssueTool:
         filtered_params = {k: v for k, v in params.items() if k in allowed_params}
 
         # Convert priority string to int
-        if "priority" in filtered_params and isinstance(filtered_params["priority"], str):
-            priority_map = {"critical": 0, "high": 1, "medium": 2, "normal": 2, "low": 3, "deferred": 4}
+        if "priority" in filtered_params and isinstance(
+            filtered_params["priority"], str
+        ):
+            priority_map = {
+                "critical": 0,
+                "high": 1,
+                "medium": 2,
+                "normal": 2,
+                "low": 3,
+                "deferred": 4,
+            }
             priority_str = filtered_params["priority"].lower()
             if priority_str in priority_map:
                 filtered_params["priority"] = priority_map[priority_str]
@@ -118,7 +151,9 @@ class IssueTool:
                 try:
                     filtered_params["priority"] = int(filtered_params["priority"])
                 except ValueError:
-                    raise ValueError(f"Invalid priority value: {filtered_params['priority']}")
+                    raise ValueError(
+                        f"Invalid priority value: {filtered_params['priority']}"
+                    )
 
         issue = self.issue_manager.create_issue(**filtered_params)
         return {"issue": issue.to_dict()}
@@ -148,7 +183,14 @@ class IssueTool:
 
         # Convert priority if it's a string
         if "priority" in params and isinstance(params["priority"], str):
-            priority_map = {"critical": 0, "high": 1, "medium": 2, "normal": 2, "low": 3, "deferred": 4}
+            priority_map = {
+                "critical": 0,
+                "high": 1,
+                "medium": 2,
+                "normal": 2,
+                "low": 3,
+                "deferred": 4,
+            }
             priority_str = params["priority"].lower()
             if priority_str in priority_map:
                 params["priority"] = priority_map[priority_str]
@@ -181,7 +223,8 @@ class IssueTool:
         blocked = self.issue_manager.get_blocked_issues()
         return {
             "blocked_issues": [
-                {"issue": issue.to_dict(), "blockers": [b.to_dict() for b in blockers]} for issue, blockers in blocked
+                {"issue": issue.to_dict(), "blockers": [b.to_dict() for b in blockers]}
+                for issue, blockers in blocked
             ],
             "count": len(blocked),
         }
