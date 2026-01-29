@@ -60,8 +60,10 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     # Get base directory with ~ expansion
     base_dir = Path(config.get("data_dir", "~/.amplifier/projects")).expanduser()
 
-    # Get project slug from current working directory
-    project_path = Path.cwd()
+    # Get project path from session capability (inherited from parent) or fall back to cwd
+    # This ensures workers use the same project directory as the root session
+    working_dir = coordinator.get_capability("session.working_dir")
+    project_path = Path(working_dir) if working_dir else Path.cwd()
     project_slug = get_project_slug(project_path)
 
     # Construct final data directory: base_dir / project_slug / issues
@@ -74,5 +76,7 @@ async def mount(coordinator: ModuleCoordinator, config: dict[str, Any] | None = 
     # Create tool with embedded IssueManager and session linking
     tool = IssueTool(coordinator, data_dir=data_dir, actor=actor, session_id=session_id)
     await coordinator.mount("tools", tool, name=tool.name)
-    logger.info(f"Mounted issue management tool with data_dir={data_dir}, session_id={session_id}")
+    logger.info(
+        f"Mounted issue management tool with data_dir={data_dir}, session_id={session_id}"
+    )
     return
