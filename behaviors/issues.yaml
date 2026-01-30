@@ -12,6 +12,13 @@ tools:
       auto_create_dir: true
       actor: assistant
 
+  - module: tool-slash-command
+    source: git+https://github.com/microsoft/amplifier-module-tool-slash-command@main
+    # TODO: Uncomment when https://github.com/microsoft/amplifier/issues/200 is fixed
+    # config:
+    #   commands:
+    #     - git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=commands
+
 hooks:
   - module: hook-issue-session-start
     source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-session-start
