@@ -16,7 +16,7 @@ class Issue:
     id: str
     title: str
     description: str
-    status: str  # open|in_progress|blocked|closed
+    status: str  # open|in_progress|blocked|closed|completed|pending_user_input
     priority: int  # 0-4 (0=highest)
     issue_type: str  # bug|feature|task|epic|chore
     assignee: str | None
@@ -60,7 +60,9 @@ class Issue:
             assignee=data.get("assignee"),
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
-            closed_at=datetime.fromisoformat(data["closed_at"]) if data.get("closed_at") else None,
+            closed_at=datetime.fromisoformat(data["closed_at"])
+            if data.get("closed_at")
+            else None,
             parent_id=data.get("parent_id"),
             discovered_from=data.get("discovered_from"),
             blocking_notes=data.get("blocking_notes"),

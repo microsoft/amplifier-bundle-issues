@@ -36,7 +36,8 @@ def get_ready_issues(
 
         for blocker_id in blockers:
             blocker = index.get_issue(blocker_id)
-            if blocker and blocker.status != "closed":
+            # Blocker is resolved if closed or completed
+            if blocker and blocker.status not in ("closed", "completed"):
                 has_open_blocker = True
                 break
 

@@ -22,7 +22,9 @@ class IssueManager:
     priority-based scheduling, event tracking, and Amplifier session linking.
     """
 
-    def __init__(self, data_dir: Path, actor: str = "system", session_id: str | None = None):
+    def __init__(
+        self, data_dir: Path, actor: str = "system", session_id: str | None = None
+    ):
         """Initialize issue manager.
 
         Args:
@@ -58,7 +60,9 @@ class IssueManager:
         deps = self.index.get_all_dependencies()
         self.storage.save_dependencies(deps)
 
-    def _emit_event(self, issue_id: str, event_type: str, changes: dict[str, Any]) -> None:
+    def _emit_event(
+        self, issue_id: str, event_type: str, changes: dict[str, Any]
+    ) -> None:
         """Emit an issue event with session tracking.
 
         Args:
@@ -162,7 +166,7 @@ class IssueManager:
             issue_id: Issue ID
             title: New title
             description: New description
-            status: New status (open|in_progress|blocked|closed)
+            status: New status (open|in_progress|blocked|closed|completed|pending_user_input)
             priority: New priority (0-4)
             assignee: New assignee
             blocking_notes: Notes about what's blocking
@@ -189,8 +193,21 @@ class IssueManager:
             issue.description = description
 
         if status is not None:
-            if status not in ("open", "in_progress", "blocked", "closed"):
-                raise ValueError("Invalid status")
+            # Normalize status aliases for compatibility with other systems (e.g., foreman)
+            status_aliases = {"done": "completed", "waiting": "pending_user_input"}
+            status = status_aliases.get(status, status)
+            valid_statuses = (
+                "open",
+                "in_progress",
+                "blocked",
+                "closed",
+                "completed",
+                "pending_user_input",
+            )
+            if status not in valid_statuses:
+                raise ValueError(
+                    f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+                )
             changes["status"] = {"old": issue.status, "new": status}
             issue.status = status
 
@@ -268,7 +285,9 @@ class IssueManager:
         """
         return self.index.list_issues(status, priority, issue_type, assignee)
 
-    def add_dependency(self, from_id: str, to_id: str, dep_type: str = "blocks") -> Dependency:
+    def add_dependency(
+        self, from_id: str, to_id: str, dep_type: str = "blocks"
+    ) -> Dependency:
         """Add a dependency between issues.
 
         Args:
