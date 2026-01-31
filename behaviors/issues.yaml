@@ -8,7 +8,7 @@ tools:
   - module: tool-issue
     source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/tool-issue
     config:
-      data_dir: ~/.amplifier/projects/{project}/issues
+      data_dir: ~/.amplifier/projects
       auto_create_dir: true
       actor: assistant
 
