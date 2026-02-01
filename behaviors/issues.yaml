@@ -4,6 +4,10 @@ bundle:
   version: 2.0.1
   description: Issue-aware bundle with autonomous issue management and persistent tracking
 
+# Include foundation for standalone use
+includes:
+  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
+
 tools:
   - module: tool-issue
     source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/tool-issue
