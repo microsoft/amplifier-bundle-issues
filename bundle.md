@@ -5,6 +5,7 @@ bundle:
   description: Issue-aware bundle with autonomous issue management and persistent tracking
 
 includes:
+  - bundle: git+https://github.com/microsoft/amplifier-foundation@main # For standalone use
   - bundle: issues:behaviors/issues
 ---
 
