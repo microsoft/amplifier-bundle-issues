@@ -1,0 +1,105 @@
+name: "issue-queue"
+description: "Process issues from the persistent issue queue one at a time. Each iteration fetches the next ready issue, plans work, implements, commits, and closes it."
+version: "1.0.0"
+tags: ["automation", "issue-queue"]
+
+# Required agents: foundation:explorer, foundation:zen-architect,
+#                  foundation:modular-builder, foundation:git-ops
+#
+# Context:
+#   issue_prompt (REQUIRED) - Project-specific instructions for working issues
+#   max_issues   (optional) - Maximum issues to process (default: 10)
+
+context:
+  issue_prompt: ""
+  max_issues: "10"
+
+steps:
+  - id: "fetch-next-issue"
+    agent: "foundation:explorer"
+    prompt: |
+      Call the issue_manager tool to get the next ready issue from the queue.
+
+      Use EXACTLY this tool call:
+        issue_manager with operation="get_ready" and params={"limit": 1}
+
+      If an issue was returned, respond with ONLY this JSON (no other text):
+      {"found": "true", "issue_id": "<the-full-uuid>", "title": "<title>", "description": "<full description>"}
+
+      If NO ready issues exist, respond with ONLY:
+      {"found": "false"}
+    output: "current_issue"
+    parse_json: true
+
+  - id: "process-issues"
+    type: "bash"
+    command: "echo 'Processing issue queue'"
+    while_condition: "{{current_issue.found}} == 'true'"
+    max_while_iterations: 50
+    break_when: "{{_loop_iteration}} >= {{max_issues}}"
+    while_steps:
+      - id: "mark-in-progress"
+        agent: "foundation:explorer"
+        prompt: |
+          Mark this issue as in-progress. Use EXACTLY this tool call:
+            issue_manager with operation="update" and params={"issue_id": "{{current_issue.issue_id}}", "status": "in_progress"}
+
+      - id: "plan-work"
+        agent: "foundation:zen-architect"
+        mode: "ANALYZE"
+        prompt: |
+          Plan the implementation for this issue:
+
+          Issue: {{current_issue.title}}
+          Description: {{current_issue.description}}
+
+          Project context and instructions:
+          {{issue_prompt}}
+
+          Produce a concrete implementation plan with specific files and changes.
+        output: "work_plan"
+
+      - id: "implement"
+        agent: "foundation:modular-builder"
+        prompt: |
+          Implement the following plan:
+
+          {{work_plan}}
+
+          Issue: {{current_issue.title}}
+
+          Project context:
+          {{issue_prompt}}
+        output: "impl_result"
+
+      - id: "commit-and-push"
+        agent: "foundation:git-ops"
+        prompt: |
+          Commit and push the changes just made.
+
+          Issue: {{current_issue.title}} (ID: {{current_issue.issue_id}})
+
+          Write a clear commit message describing the work.
+        output: "commit_result"
+
+      - id: "close-issue"
+        agent: "foundation:explorer"
+        prompt: |
+          Close this issue in the queue. Use EXACTLY this tool call:
+            issue_manager with operation="close" and params={"issue_id": "{{current_issue.issue_id}}"}
+
+      - id: "fetch-next"
+        agent: "foundation:explorer"
+        prompt: |
+          Call the issue_manager tool to get the next ready issue from the queue.
+
+          Use EXACTLY this tool call:
+            issue_manager with operation="get_ready" and params={"limit": 1}
+
+          If an issue was returned, respond with ONLY this JSON (no other text):
+          {"found": "true", "issue_id": "<the-full-uuid>", "title": "<title>", "description": "<full description>"}
+
+          If NO ready issues exist, respond with ONLY:
+          {"found": "false"}
+        output: "current_issue"
+        parse_json: true

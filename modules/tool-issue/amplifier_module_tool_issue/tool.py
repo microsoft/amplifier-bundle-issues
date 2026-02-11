@@ -50,7 +50,11 @@ class IssueTool:
 
     @property
     def input_schema(self) -> dict:
-        """Return JSON schema for tool parameters."""
+        """Return JSON schema for tool parameters.
+
+        Parameters can be passed either nested inside 'params' or flat
+        alongside 'operation'. Both formats are accepted.
+        """
         return {
             "type": "object",
             "properties": {
@@ -71,7 +75,64 @@ class IssueTool:
                 },
                 "params": {
                     "type": "object",
-                    "description": "Parameters for the operation. Most operations use issue_id. For add_dependency, use from_id (blocked issue) and to_id (blocking issue).",
+                    "description": "Parameters for the operation. Can also be passed as top-level fields instead of nested here.",
+                },
+                "issue_id": {
+                    "type": "string",
+                    "description": "Issue UUID (for get, update, close, get_sessions)",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Issue title (for create)",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Issue description (for create, update)",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "in_progress",
+                        "blocked",
+                        "closed",
+                        "completed",
+                        "pending_user_input",
+                    ],
+                    "description": "Issue status (for update, list). Aliases: done=completed, waiting=pending_user_input",
+                },
+                "priority": {
+                    "type": ["string", "integer"],
+                    "description": "Priority 0-4 or name: critical=0, high=1, medium/normal=2, low=3, deferred=4 (for create, update, list)",
+                },
+                "issue_type": {
+                    "type": "string",
+                    "enum": ["bug", "feature", "task", "epic", "chore"],
+                    "description": "Issue type (for create, list)",
+                },
+                "assignee": {
+                    "type": "string",
+                    "description": "Assignee (for create, update, list)",
+                },
+                "from_id": {
+                    "type": "string",
+                    "description": "Blocked issue ID (for add_dependency)",
+                },
+                "to_id": {
+                    "type": "string",
+                    "description": "Blocking issue ID (for add_dependency)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max issues to return (for get_ready)",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for closing (for close)",
+                },
+                "blocking_notes": {
+                    "type": "string",
+                    "description": "Notes on what is blocking (for update)",
                 },
             },
             "required": ["operation"],
@@ -101,7 +162,10 @@ class IssueTool:
         if not operation:
             return ToolResult(success=False, error={"message": "Operation is required"})
 
+        # Accept params nested inside 'params' or flat alongside 'operation'
         params = input.get("params", {})
+        if not params:
+            params = {k: v for k, v in input.items() if k != "operation"}
 
         # Resolve short-form issue IDs to full UUIDs before dispatch
         try:
