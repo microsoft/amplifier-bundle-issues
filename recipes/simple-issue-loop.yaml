@@ -1,0 +1,104 @@
+name: "simple-issue-loop"
+description: "Process issues using a single capable agent per issue. The recipe handles the loop; the agent handles the work."
+version: "1.0.0"
+tags: ["automation", "issue-queue"]
+
+# The recipe is a thin loop. Each issue gets one full agent session
+# that can delegate to sub-agents (zen-architect, modular-builder, etc.)
+# just like an interactive session would.
+#
+# Context:
+#   issue_prompt (REQUIRED) - Project-specific instructions and context.
+#                             This is your prompt - tell the agent what files
+#                             to read, what repos matter, how to approach work.
+#   max_issues   (optional) - Maximum issues to process (default: 5)
+
+context:
+  issue_prompt: ""
+  max_issues: "5"
+
+steps:
+  - id: "fetch-issue"
+    agent: "foundation:explorer"
+    prompt: |
+      Call the issue_manager tool to get the next ready issue from the queue.
+
+      Use EXACTLY this tool call:
+        issue_manager with operation="get_ready" and params={"limit": 1}
+
+      If an issue was returned, respond with ONLY this JSON (no other text):
+      {"found": "true", "issue_id": "<the-full-uuid>", "title": "<title>"}
+
+      Do NOT include the description in the JSON.
+
+      If NO ready issues exist, respond with ONLY:
+      {"found": "false"}
+    output: "current_issue"
+    parse_json: true
+
+  - id: "process-loop"
+    type: "bash"
+    command: "echo 'starting issue loop'"
+    while_condition: "{{current_issue.found}} == 'true'"
+    max_while_iterations: 50
+    break_when: "{{_loop_iteration}} >= {{max_issues}}"
+    while_steps:
+      - id: "mark-in-progress"
+        agent: "foundation:explorer"
+        prompt: |
+          Mark issue {{current_issue.issue_id}} as in-progress.
+          Use EXACTLY this tool call:
+            issue_manager with operation="update"
+              and params={"issue_id": "{{current_issue.issue_id}}", "status": "in_progress"}
+          Respond with: "Marked in-progress."
+
+      - id: "work-issue"
+        agent: "self"
+        prompt: |
+          You have an issue to work on. Here is your project context:
+
+          {{issue_prompt}}
+
+          THE ISSUE TO WORK ON:
+          Title: {{current_issue.title}}
+          ID: {{current_issue.issue_id}}
+
+          INSTRUCTIONS:
+          1. First, fetch the full issue details:
+             issue_manager with operation="get" and params={"issue_id": "{{current_issue.issue_id}}"}
+          2. Review the issue and understand what needs to be done
+          3. Use your sub-agents to get the work done - delegate to
+             zen-architect for analysis and planning, modular-builder
+             for implementation, and others as needed. They have expertise
+             and help preserve your context.
+          4. When the work is done, commit and push using git-ops
+          5. Close the issue:
+             issue_manager with operation="close"
+               and params={"issue_id": "{{current_issue.issue_id}}"}
+
+          If you cannot complete the issue (blocked, unclear requirements,
+          too complex), do NOT close it. Instead update it:
+            issue_manager with operation="update"
+              and params={"issue_id": "{{current_issue.issue_id}}", "status": "open",
+                "blocking_notes": "<explain what blocked you>"}
+
+          When finished, provide a short summary of what you did.
+        output: "work_result"
+
+      - id: "fetch-next"
+        agent: "foundation:explorer"
+        prompt: |
+          Call the issue_manager tool to get the next ready issue from the queue.
+
+          Use EXACTLY this tool call:
+            issue_manager with operation="get_ready" and params={"limit": 1}
+
+          If an issue was returned, respond with ONLY this JSON (no other text):
+          {"found": "true", "issue_id": "<the-full-uuid>", "title": "<title>"}
+
+          Do NOT include the description in the JSON.
+
+          If NO ready issues exist, respond with ONLY:
+          {"found": "false"}
+        output: "current_issue"
+        parse_json: true
