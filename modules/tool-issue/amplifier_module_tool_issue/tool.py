@@ -67,6 +67,7 @@ class IssueTool:
                         "update",
                         "close",
                         "add_dependency",
+                        "remove_dependency",
                         "get_ready",
                         "get_blocked",
                         "get_sessions",
@@ -186,6 +187,8 @@ class IssueTool:
                 result = await self._close_issue(params)
             elif operation == "add_dependency":
                 result = await self._add_dependency(params)
+            elif operation == "remove_dependency":
+                result = await self._remove_dependency(params)
             elif operation == "get_ready":
                 result = await self._get_ready_issues(params)
             elif operation == "get_blocked":
@@ -300,6 +303,15 @@ class IssueTool:
         """Add a dependency between issues."""
         dep = self.issue_manager.add_dependency(**params)
         return {"dependency": dep.to_dict()}
+
+    async def _remove_dependency(self, params: dict) -> dict:
+        """Remove a dependency between issues."""
+        from_id = params.get("from_id")
+        to_id = params.get("to_id")
+        if not from_id or not to_id:
+            raise ValueError("from_id and to_id are required")
+        self.issue_manager.remove_dependency(from_id, to_id)
+        return {"removed": True, "from_id": from_id, "to_id": to_id}
 
     async def _get_ready_issues(self, params: dict) -> dict:
         """Get issues that are ready to work on (no blockers)."""

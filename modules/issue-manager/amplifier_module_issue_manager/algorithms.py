@@ -63,7 +63,7 @@ def get_blocked_issues(index: IssueIndex) -> list[tuple[Issue, list[Issue]]]:
     blocked = []
 
     for issue in index.issues.values():
-        if issue.status == "closed":
+        if issue.status in ("closed", "completed"):
             continue
 
         blocker_ids = index.get_blockers(issue.id)
@@ -71,7 +71,7 @@ def get_blocked_issues(index: IssueIndex) -> list[tuple[Issue, list[Issue]]]:
 
         for blocker_id in blocker_ids:
             blocker = index.get_issue(blocker_id)
-            if blocker and blocker.status != "closed":
+            if blocker and blocker.status not in ("closed", "completed"):
                 open_blockers.append(blocker)
 
         if open_blockers:

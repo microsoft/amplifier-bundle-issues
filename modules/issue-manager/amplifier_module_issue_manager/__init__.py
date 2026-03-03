@@ -34,16 +34,13 @@ async def mount(coordinator, config: dict | None = None):
     data_dir = Path(config.get("data_dir", ".amplifier/issues"))
     actor = config.get("actor", "system")
 
-    logger.info(f"DEBUG mount(): Creating IssueManager with data_dir={data_dir}")
+    logger.debug(f"mount(): Creating IssueManager with data_dir={data_dir}")
 
     if config.get("auto_create_dir", True):
         data_dir.mkdir(parents=True, exist_ok=True)
 
     issue_manager = IssueManager(data_dir, actor=actor)
-    logger.info(f"DEBUG mount(): IssueManager instance created: {issue_manager}")
-    logger.info("DEBUG mount(): About to call coordinator.mount('issue-manager', issue_manager)")
     await coordinator.mount("issue-manager", issue_manager)
-    logger.info("DEBUG mount(): After coordinator.mount, checking result...")
-    logger.info(f"DEBUG mount(): coordinator.get('issue-manager') = {coordinator.get('issue-manager')}")
+    logger.debug("mount(): IssueManager mounted successfully")
 
     return
