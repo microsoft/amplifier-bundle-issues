@@ -205,7 +205,9 @@ class IssueSessionStartHook:
             return []
 
         try:
-            result = await issue_tool.execute(operation="list", params={"status": "open"})
+            result = await issue_tool.execute(
+                {"operation": "list", "params": {"status": "open"}}
+            )
             return result.get("issues", [])
         except Exception as e:
             logger.debug(f"hook-issue-session-start: Error getting issues: {e}")

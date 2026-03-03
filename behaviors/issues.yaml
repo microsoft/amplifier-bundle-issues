@@ -34,6 +34,11 @@ hooks:
       max_auto_iterations: 10
       inject_role: system
 
+  - module: hook-issue-session-end
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-session-end
+    config:
+      priority: 90
+
 context:
   include:
     - issues:context/issues-instructions.md

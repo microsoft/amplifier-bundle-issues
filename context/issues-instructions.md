@@ -81,8 +81,19 @@ The issue_manager tool supports:
 - **get** - Get details of a specific issue (params: issue_id)
 - **update** - Update issue fields (params: issue_id, status, priority, blocking_notes)
 - **close** - Mark issue as complete (params: issue_id, reason)
+- **add_dependency** - Link issues with dependencies (params: from_id, to_id, dep_type)
+- **remove_dependency** - Remove dependency links (params: from_id, to_id)
 - **get_ready** - Get issues ready to work on (params: limit, assignee, priority)
 - **get_blocked** - Get blocked issues
 - **get_sessions** - Get all sessions linked to an issue (params: issue_id)
+
+## Issue Statuses
+
+- **open** - Created, not yet started
+- **in_progress** - Actively being worked on
+- **blocked** - Waiting on dependencies
+- **closed** - Completed
+- **completed** - Done (alias: `done`)
+- **pending_user_input** - Waiting for user response (alias: `waiting`)
 
 Remember: You're working autonomously through a persistent issue queue. Use the issue_manager tool to check for ready work before asking what to do next.

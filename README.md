@@ -76,6 +76,11 @@ hooks:
       priority: 100
       max_auto_iterations: 10
       inject_role: system
+
+  - module: hook-issue-session-end
+    source: git+https://github.com/microsoft/amplifier-bundle-issues@main#subdirectory=modules/hook-issue-session-end
+    config:
+      priority: 90
 ```
 
 Then add instructions in your bundle context similar to what is found in the [bundle.md](./bundle.md).
@@ -107,10 +112,10 @@ The issue_manager tool supports:
 - **get** - Show issue details
 - **update** - Change status, priority, blocking notes
 - **close** - Mark complete with reason
+- **add_dependency** - Link issues with dependencies
+- **remove_dependency** - Remove dependency links
 - **get_ready** - Find work with no blockers
 - **get_blocked** - See blocked issues
-- **add_dep** - Link issues with dependencies
-- **remove_dep** - Remove dependency links
 - **get_sessions** - Get all Amplifier sessions linked to an issue
 
 ## Issue States
@@ -119,6 +124,8 @@ The issue_manager tool supports:
 - **in_progress** - Actively being worked on
 - **blocked** - Waiting on dependencies
 - **closed** - Completed
+- **completed** - Done (alias: `done`)
+- **pending_user_input** - Waiting for user response (alias: `waiting`)
 
 ## Session Linking
 

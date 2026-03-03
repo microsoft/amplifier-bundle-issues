@@ -55,13 +55,18 @@ class IssueAutoWorkHook:
         self.priority = config.get("priority", 100)
         self.max_auto_iterations = config.get("max_auto_iterations", 10)
         self.inject_role = config.get("inject_role", "system")
-        
+
         # Track auto-work iterations to prevent infinite loops
         self.auto_iteration_count = 0
 
     def register(self, hooks):
         """Register hook on PROMPT_COMPLETE event."""
-        hooks.register("prompt:complete", self.on_prompt_complete, priority=self.priority, name="hook-issue-auto-work")
+        hooks.register(
+            "prompt:complete",
+            self.on_prompt_complete,
+            priority=self.priority,
+            name="hook-issue-auto-work",
+        )
 
     async def on_prompt_complete(self, event: str, data: dict[str, Any]) -> HookResult:
         """Check for ready issues after each turn and continue working if found.
@@ -76,19 +81,21 @@ class IssueAutoWorkHook:
         # Check if issue_manager tool is available
         tools = getattr(self.coordinator, "tools", {})
         issue_manager_tool = None
-        
+
         for tool_name, tool in tools.items():
             if "issue" in tool_name.lower():
                 issue_manager_tool = tool
                 break
-        
+
         if not issue_manager_tool:
-            logger.debug("hook-issue-auto-work: issue_manager tool not available, skipping")
+            logger.debug(
+                "hook-issue-auto-work: issue_manager tool not available, skipping"
+            )
             return HookResult(action="continue")
 
         # Check for iteration limit to prevent infinite loops
         self.auto_iteration_count += 1
-        
+
         if self.auto_iteration_count >= self.max_auto_iterations:
             logger.info(
                 f"hook-issue-auto-work: Reached max auto iterations ({self.max_auto_iterations}), "
@@ -101,12 +108,11 @@ class IssueAutoWorkHook:
         try:
             # Call issue_manager to get ready issues
             result = await issue_manager_tool.execute(
-                operation="get_ready",
-                params={"limit": 5}
+                {"operation": "get_ready", "params": {"limit": 5}}
             )
-            
-            ready_issues = result.get("issues", [])
-            
+
+            ready_issues = result.get("ready_issues", [])
+
             if not ready_issues:
                 logger.debug("hook-issue-auto-work: No ready issues found")
                 # Reset counter when no work left
@@ -115,12 +121,12 @@ class IssueAutoWorkHook:
 
             # Format ready issues for context injection
             issues_text = self._format_ready_issues(ready_issues)
-            
+
             logger.info(
                 f"hook-issue-auto-work: Found {len(ready_issues)} ready issues, "
                 f"injecting context to continue work (iteration {self.auto_iteration_count}/{self.max_auto_iterations})"
             )
-            
+
             # Inject context to tell assistant to keep working
             context_message = (
                 f"<system-reminder>\n"
@@ -132,7 +138,7 @@ class IssueAutoWorkHook:
                 f"Only stop and present to the user when ALL issues are completed or blocked.\n"
                 f"</system-reminder>"
             )
-            
+
             return HookResult(
                 action="inject_context",
                 context_injection=context_message,
@@ -140,7 +146,7 @@ class IssueAutoWorkHook:
                 ephemeral=True,  # Don't store in history
                 suppress_output=True,  # Don't show to user
             )
-            
+
         except Exception as e:
             logger.error(f"hook-issue-auto-work: Error checking for ready issues: {e}")
             # Don't block on errors
@@ -161,7 +167,7 @@ class IssueAutoWorkHook:
             title = issue.get("title", "No title")
             priority = issue.get("priority", 2)
             issue_type = issue.get("issue_type", "task")
-            
+
             # Priority indicators
             priority_indicator = {
                 0: "🔴",  # Critical
@@ -170,7 +176,7 @@ class IssueAutoWorkHook:
                 3: "🟢",  # Low
                 4: "⚪",  # Deferred
             }.get(priority, "🟡")
-            
+
             lines.append(f"{priority_indicator} #{issue_id} [{issue_type}] {title}")
-        
+
         return "\n".join(lines)
