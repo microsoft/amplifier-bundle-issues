@@ -111,7 +111,11 @@ class IssueAutoWorkHook:
                 {"operation": "get_ready", "params": {"limit": 5}}
             )
 
-            ready_issues = result.get("ready_issues", [])
+            ready_issues = (
+                result.output.get("ready_issues", [])
+                if isinstance(result.output, dict)
+                else []
+            )
 
             if not ready_issues:
                 logger.debug("hook-issue-auto-work: No ready issues found")
@@ -163,7 +167,7 @@ class IssueAutoWorkHook:
         """
         lines = []
         for issue in issues:
-            issue_id = issue.get("issue_id", "?")
+            issue_id = issue.get("id", "?")
             title = issue.get("title", "No title")
             priority = issue.get("priority", 2)
             issue_type = issue.get("issue_type", "task")

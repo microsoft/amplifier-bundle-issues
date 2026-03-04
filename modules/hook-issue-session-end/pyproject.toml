@@ -5,7 +5,6 @@ description = "Hook that marks issues when Amplifier sessions end for session li
 requires-python = ">=3.11"
 dependencies = [
     "amplifier-core",
-    "amplifier-module-issue-manager",
 ]
 
 [build-system]

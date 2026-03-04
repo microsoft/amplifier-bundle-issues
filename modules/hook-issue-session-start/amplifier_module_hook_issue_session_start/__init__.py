@@ -98,7 +98,7 @@ class IssueSessionStartHook:
         """
         self.session_start_handled = True
 
-        issues = await self._get_open_issues()
+        issues = await self._get_active_issues()
         if not issues:
             logger.debug("hook-issue-session-start: No open issues found")
             return HookResult(action="continue")
@@ -161,7 +161,7 @@ class IssueSessionStartHook:
             return HookResult(action="continue")
 
         # Check if there are open issues
-        issues = await self._get_open_issues()
+        issues = await self._get_active_issues()
         if not issues:
             return HookResult(action="continue")
 
@@ -185,11 +185,11 @@ class IssueSessionStartHook:
             suppress_output=True,
         )
 
-    async def _get_open_issues(self) -> list[dict]:
-        """Get open issues from issue_manager tool.
+    async def _get_active_issues(self) -> list[dict]:
+        """Get active issues (open, in_progress, blocked) from issue_manager tool.
 
         Returns:
-            List of open issue dicts, or empty list if tool not available
+            List of active issue dicts, or empty list if tool not available
         """
         # Find issue_manager tool
         tools = getattr(self.coordinator, "tools", {})
@@ -204,14 +204,24 @@ class IssueSessionStartHook:
             logger.debug("hook-issue-session-start: issue_manager tool not available")
             return []
 
-        try:
-            result = await issue_tool.execute(
-                {"operation": "list", "params": {"status": "open"}}
-            )
-            return result.get("issues", [])
-        except Exception as e:
-            logger.debug(f"hook-issue-session-start: Error getting issues: {e}")
-            return []
+        active_issues = []
+        for status in ("open", "in_progress", "blocked"):
+            try:
+                result = await issue_tool.execute(
+                    {"operation": "list", "params": {"status": status}}
+                )
+                issues = (
+                    result.output.get("issues", [])
+                    if isinstance(result.output, dict)
+                    else []
+                )
+                active_issues.extend(issues)
+            except Exception as e:
+                logger.debug(
+                    f"hook-issue-session-start: Error getting {status} issues: {e}"
+                )
+
+        return active_issues
 
     def _format_issue_summary(self, issues: list[dict]) -> str:
         """Format issues into a summary grouped by status.
